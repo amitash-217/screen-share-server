@@ -34,6 +34,8 @@ struct State {
     ws: Option<UnboundedSender<ClientMsg>>,
     model: AppModel,
     config: Config,
+    /// Set at launch when a server, user and saved password exist: sign in without asking.
+    auto_login: bool,
     /// Bumped on every sign-in and sign-out so late events from an old link are ignored.
     generation: u64,
     /// Started once at launch; `None` until it is ready, or when the system has no usable audio.
@@ -115,6 +117,14 @@ fn main() -> Result<(), slint::PlatformError> {
         state: Arc::new(Mutex::new(State { config, ..State::default() })),
     };
     wire(&ui, &app);
+    let (server, insecure, username) = {
+        let st = app.state.lock().unwrap();
+        (st.config.server.clone(), st.config.insecure, st.config.username.clone())
+    };
+    if !server.is_empty() && !username.is_empty() && !saved_password(&server, &username).is_empty() {
+        app.state.lock().unwrap().auto_login = true;
+        app.connect(server, insecure);
+    }
     app.start_audio();
     // The manager must live as long as the window, and on macOS be created on the main thread.
     let _hotkey = register_mute_hotkey(&app);
@@ -557,6 +567,7 @@ impl App {
             }
             .await;
             let state = app.state.clone();
+            let again = app.clone();
             app.with_ui(move |ui| {
                 ui.set_busy(false);
                 match result {
@@ -566,11 +577,20 @@ impl App {
                         st.config.insecure = insecure;
                         st.config.save();
                         ui.set_server_label(addr.display().into());
-                        ui.set_password_input(saved_password(&st.config.server, &st.config.username).into());
+                        let password = saved_password(&st.config.server, &st.config.username);
+                        ui.set_password_input(password.clone().into());
                         st.addr = Some(addr);
                         ui.set_screen(1);
+                        let auto = std::mem::take(&mut st.auto_login).then(|| st.config.username.clone());
+                        drop(st);
+                        if let Some(username) = auto {
+                            again.authenticate(username, password, false);
+                        }
                     }
-                    Err(e) => ui.set_status(e.into()),
+                    Err(e) => {
+                        state.lock().unwrap().auto_login = false;
+                        ui.set_status(e.into());
+                    }
                 }
             });
         });

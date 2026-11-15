@@ -12,6 +12,8 @@ fn the_real_microphone_opens_and_closes() {
     println!("inputs: {:?}", engine.inputs());
     println!("outputs: {:?}", engine.outputs());
     let track = engine.local_track();
+    println!("state: {}", engine.describe());
+    assert!(engine.describe().contains("recording initialized=true"), "the microphone did not open");
     println!("microphone track created: {}", track.id());
     std::thread::sleep(Duration::from_secs(2));
     drop(track);

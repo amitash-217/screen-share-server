@@ -95,13 +95,15 @@ impl AudioEngine {
         slot.get_or_insert_with(|| {
             let track = self.factory.create_device_audio_track("microphone");
             track.set_enabled(!self.muted.load(Ordering::Relaxed));
-            // WebRTC only starts the devices once a connection sends or receives audio, so
-            // alone in a room the microphone would stay closed and the OS would never ask
-            // for permission. Open them now.
+            // WebRTC only starts the microphone once a connection sends audio, so alone in a
+            // room it would stay closed and the OS would never ask for permission. Open it now.
+            // Init fails until a device is chosen; index 0 is the system default.
+            self.factory.set_recording_device(0);
             self.factory.init_recording();
             self.factory.start_recording();
-            self.factory.init_playout();
-            self.factory.start_playout();
+            // Playout is only selected, not started: started with nothing to play it buzzes.
+            // WebRTC starts it itself when the first remote audio arrives.
+            self.factory.set_playout_device(0);
             track
         })
         .clone()
@@ -117,6 +119,10 @@ impl AudioEngine {
 
 impl Drop for AudioEngine {
     fn drop(&mut self) {
+        // Releasing the layer while the devices run crashes inside libwebrtc.
+        self.track.lock().unwrap().take();
+        self.factory.stop_recording();
+        self.factory.stop_playout();
         self.factory.release_platform_adm();
     }
 }
