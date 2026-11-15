@@ -20,7 +20,8 @@ Working name: "ScreenTalk" is a placeholder.
 | `crates/client` | The desktop app (Slint UI, libwebrtc) |
 | `crates/sysaudio` | Captures the computer's sound (ScreenCaptureKit on macOS, WASAPI on Windows) |
 | `deploy/` | Docker Compose: server, Postgres, coturn, optional Caddy for HTTPS |
-| `docs/PLAN.md` | Decisions, phases, findings, known risks |
+| `docs/PLAN.md` | Decisions, phases, open work, known risks |
+| `docs/NOTES.md` | Spike results and per-phase findings |
 
 ## Run your own server
 

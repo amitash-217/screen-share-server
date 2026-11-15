@@ -280,7 +280,15 @@ component ShareTile inherits Rectangle {
     in property <bool> enlarged;
     callback clicked();
     background: black;
+    // The frame's pixel size must not drive the layout, or a 1080p share pushes the controls off the window.
+    min-width: 0px;
+    min-height: 0px;
+    preferred-width: 1px;
+    preferred-height: 1px;
+    clip: true;
     Image {
+        width: parent.width;
+        height: parent.height;
         source: root.item.video;
         image-fit: contain;
     }
@@ -427,6 +435,7 @@ component RoomScreen inherits VerticalLayout {
     // One person's screen fills the view when enlarged, otherwise all screens share a row.
     if root.enlarged >= 0 && root.enlarged < root.shares.length: ShareTile {
         vertical-stretch: 1;
+        min-height: 0px;
         item: root.shares[root.enlarged];
         enlarged: true;
         clicked => {
@@ -435,6 +444,7 @@ component RoomScreen inherits VerticalLayout {
     }
     if root.enlarged < 0 || root.enlarged >= root.shares.length: HorizontalLayout {
         vertical-stretch: 1;
+        min-height: 0px;
         spacing: 8px;
         for s[i] in root.shares: ShareTile {
             item: s;
