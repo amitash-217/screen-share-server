@@ -1,0 +1,5 @@
+# libwebrtc's prebuilt Windows libraries are built with the static C runtime (/MT). Rust links
+# the dynamic one (/MD) by default, which fails with `LNK2038: mismatch detected for 'RuntimeLibrary'`.
+# Do not set the RUSTFLAGS environment variable on Windows: it replaces these flags.
+[target.x86_64-pc-windows-msvc]
+rustflags = ["-C", "target-feature=+crt-static"]
