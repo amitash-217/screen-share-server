@@ -365,6 +365,7 @@ impl Mesh {
         let signal: RtcSignal = serde_json::from_value(payload).map_err(|e| format!("unreadable signal: {e}"))?;
         match signal {
             RtcSignal::Offer { sdp, renegotiate } => {
+                tracing::info!(user = from, renegotiate, codecs = %video_codecs(&sdp), "offer received");
                 if !(renegotiate && self.links.contains_key(&from)) {
                     self.create_link(from, false)?;
                 }
@@ -449,6 +450,20 @@ impl Mesh {
             self.emit(MeshEvent::Level { user: self.me, level });
         }
     }
+}
+
+/// The video codecs an SDP lists, for the log: a mismatch between platforms shows up here.
+fn video_codecs(sdp: &str) -> String {
+    let mut in_video = false;
+    let mut out = Vec::new();
+    for line in sdp.lines() {
+        if line.starts_with("m=") {
+            in_video = line.starts_with("m=video");
+        } else if in_video && (line.starts_with("a=rtpmap:") || line.starts_with("a=fmtp:")) {
+            out.push(line.trim_start_matches("a="));
+        }
+    }
+    out.join(" | ")
 }
 
 async fn flush_pending(link: &mut Link) {
