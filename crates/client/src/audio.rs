@@ -31,6 +31,9 @@ impl AudioEngine {
         }
         // Without this, remote audio is only delivered to callbacks and never played.
         factory.set_adm_playout_enabled(true);
+        // Off by default: WebRTC's recording calls are then no-ops, so the microphone
+        // never opens, the OS never asks for permission and nothing is sent.
+        factory.set_adm_recording_enabled(true);
         Ok(Self { factory, track: Mutex::new(None), muted: AtomicBool::new(false) })
     }
 

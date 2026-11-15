@@ -66,10 +66,10 @@ component ConnectScreen inherits HorizontalLayout {
 component AuthScreen inherits HorizontalLayout {
     in property <string> server-label;
     in-out property <string> username;
+    in-out property <string> password;
     in property <bool> busy;
     callback submit(string, string, bool);
     callback change-server();
-    property <string> password;
     property <bool> signup: false;
     alignment: center;
 
@@ -490,6 +490,7 @@ export component MainWindow inherits Window {
     in-out property <string> server-input;
     in-out property <bool> insecure-input;
     in-out property <string> username-input;
+    in-out property <string> password-input;
     in property <string> server-label;
     in property <string> username;
     in property <bool> connected;
@@ -547,6 +548,7 @@ export component MainWindow inherits Window {
             if root.screen == 1: AuthScreen {
                 server-label: root.server-label;
                 username <=> root.username-input;
+                password <=> root.password-input;
                 busy: root.busy;
                 submit(user, password, signup) => {
                     root.authenticate(user, password, signup);

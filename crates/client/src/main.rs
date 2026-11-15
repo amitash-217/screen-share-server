@@ -11,7 +11,7 @@ use std::time::Instant;
 use client::addr::ServerAddr;
 use client::audio::{AudioEngine, Device};
 use client::capture::{self, Share, Source};
-use client::config::Config;
+use client::config::{save_password, saved_password, Config};
 use client::model::AppModel;
 use client::net::{self, NetEvent};
 use client::rtc::{spawn_mesh, MeshEvent, MeshHandle};
@@ -566,6 +566,7 @@ impl App {
                         st.config.insecure = insecure;
                         st.config.save();
                         ui.set_server_label(addr.display().into());
+                        ui.set_password_input(saved_password(&st.config.server, &st.config.username).into());
                         st.addr = Some(addr);
                         ui.set_screen(1);
                     }
@@ -589,10 +590,14 @@ impl App {
         let Some(addr) = self.state.lock().unwrap().addr.clone() else { return };
         ui.set_busy(true);
         ui.set_status("".into());
+        let server = self.state.lock().unwrap().config.server.clone();
         let app = self.clone();
         self.rt.spawn(async move {
-            match net::authenticate(&addr, signup, &Credentials { username, password }).await {
-                Ok(session) => app.start_session(addr, session),
+            match net::authenticate(&addr, signup, &Credentials { username: username.clone(), password: password.clone() }).await {
+                Ok(session) => {
+                    save_password(&server, &username, &password);
+                    app.start_session(addr, session)
+                }
                 Err(e) => app.with_ui(move |ui| {
                     ui.set_busy(false);
                     ui.set_status(e.into());

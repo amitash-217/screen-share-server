@@ -17,6 +17,8 @@ slint = "1"
 reqwest = { version = "0.12", features = ["json"] }
 tokio-tungstenite = { version = "0.26", features = ["native-tls"] }
 dirs = "6"
+# The password goes to the OS keychain (macOS Keychain, Windows Credential Manager), never to config.json.
+keyring = { version = "3", features = ["apple-native", "windows-native"] }
 libwebrtc = "0.4"
 global-hotkey = "0.7"
 sysaudio = { path = "../sysaudio" }
