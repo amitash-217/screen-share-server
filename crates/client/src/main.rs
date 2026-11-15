@@ -77,10 +77,29 @@ struct App {
     state: Arc<Mutex<State>>,
 }
 
+/// A window app started from Finder has no terminal, so log to a file next to the settings.
+/// If the app dies, the last line shows how far it got; panics are recorded there too.
+fn init_logging() {
+    let filter = tracing_subscriber::EnvFilter::try_from_default_env()
+        .unwrap_or_else(|_| tracing_subscriber::EnvFilter::new("client=info,warn"));
+    let file = dirs::config_dir().map(|d| d.join("screentalk")).and_then(|dir| {
+        std::fs::create_dir_all(&dir).ok()?;
+        std::fs::OpenOptions::new().create(true).append(true).open(dir.join("client.log")).ok()
+    });
+    match file {
+        Some(file) => {
+            tracing_subscriber::fmt().with_env_filter(filter).with_ansi(false).with_writer(Mutex::new(file)).init();
+            std::panic::set_hook(Box::new(|info| {
+                tracing::error!("panic: {info}\n{}", std::backtrace::Backtrace::force_capture());
+            }));
+        }
+        None => tracing_subscriber::fmt().with_env_filter(filter).init(),
+    }
+    tracing::info!("client started");
+}
+
 fn main() -> Result<(), slint::PlatformError> {
-    tracing_subscriber::fmt()
-        .with_env_filter(tracing_subscriber::EnvFilter::from_default_env())
-        .init();
+    init_logging();
     let rt = tokio::runtime::Builder::new_multi_thread().enable_all().build().expect("start tokio runtime");
 
     let ui = MainWindow::new()?;
@@ -300,12 +319,16 @@ impl App {
     fn start_mesh(&self, st: &mut State) {
         stop_media(st);
         let (Some(engine), Some(ws), Some(room)) = (st.engine.clone(), st.ws.clone(), st.model.current.as_ref()) else {
+            tracing::warn!("entered a room but audio or the connection is not ready: no voice");
             return;
         };
+        tracing::info!(room = room.code.as_str(), peers = room.peers.len(), "entered a room: opening the microphone");
         st.mesh_generation += 1;
         let (generation, session_generation) = (st.mesh_generation, st.generation);
         let (events, mut inbox) = unbounded_channel::<MeshEvent>();
-        let mesh = spawn_mesh(&self.rt, engine.factory(), engine.local_track(), &room.ice, st.model.me, ws, events);
+        let track = engine.local_track();
+        tracing::info!("microphone open: starting the audio mesh");
+        let mesh = spawn_mesh(&self.rt, engine.factory(), track, &room.ice, st.model.me, ws, events);
         for peer in &room.peers {
             mesh.dial(peer.user_id);
         }
@@ -400,6 +423,8 @@ impl App {
 
     /// Only call on the UI thread.
     fn toggle_share(&self, source_index: i32, with_audio: bool) {
+        // Creating the video source spawns a tokio task, and the UI thread is not in the runtime.
+        let _runtime = self.rt.enter();
         let mut st = self.state.lock().unwrap();
         if st.share.take().is_some() {
             st.system_audio = None;

@@ -105,6 +105,8 @@ pub fn spawn_mesh(
     signal_out: UnboundedSender<ClientMsg>,
     events: UnboundedSender<MeshEvent>,
 ) -> MeshHandle {
+    // libwebrtc's sources spawn tokio tasks when created, and the UI thread is not in the runtime.
+    let _runtime = rt.enter();
     let (tx, cmds) = unbounded_channel();
     let ice = ice
         .iter()

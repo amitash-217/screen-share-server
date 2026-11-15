@@ -25,6 +25,7 @@ sysaudio = { path = "../sysaudio" }
 slint-build = "1"
 
 [dev-dependencies]
+i-slint-backend-testing = "=1.18.1"
 server = { path = "../server" }
 axum = "0.8"
 sqlx = { version = "0.8", default-features = false, features = ["runtime-tokio", "postgres", "migrate", "macros"] }

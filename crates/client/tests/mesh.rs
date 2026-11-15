@@ -345,3 +345,21 @@ async fn computer_sound_arrives_as_its_own_track_and_is_not_speech() {
     assert!(rms > 1_000.0, "computer sound did not arrive: rms {rms} over {} samples", samples.len());
     assert!(loudest_voice < 0.01, "computer sound counted as speech: level {loudest_voice}");
 }
+
+/// The app starts the mesh from the window's thread, which is not inside the tokio runtime.
+#[test]
+fn the_mesh_starts_from_a_thread_outside_the_runtime() {
+    let runtime = tokio::runtime::Builder::new_multi_thread().enable_all().build().unwrap();
+    let factory = PeerConnectionFactory::default();
+    let source = NativeAudioSource::new(AudioSourceOptions::default(), RATE, 1, 1000);
+    let track = factory.create_audio_track("mic", source);
+    let (sig_tx, _sig_rx) = unbounded_channel();
+    let (ev_tx, _ev_rx) = unbounded_channel();
+    let handle = std::thread::spawn({
+        let rt = runtime.handle().clone();
+        move || spawn_mesh(&rt, factory, track, &[], 1, sig_tx, ev_tx)
+    })
+    .join()
+    .expect("starting the mesh must not panic");
+    handle.stop_share();
+}
