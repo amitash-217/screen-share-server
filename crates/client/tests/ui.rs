@@ -31,6 +31,7 @@ fn every_screen_and_the_room_view_render() {
     }])));
     ui.set_shares(ModelRc::new(VecModel::from(vec![ShareItem { username: "bob".into(), video: Default::default() }])));
     ui.set_room_code("abcde".into());
+    ui.set_pending(ModelRc::new(VecModel::from(vec![PendingItem { code: "abcde".into(), username: "cy".into() }])));
     ui.set_screen(3);
     ui.set_sharing(true);
     ui.set_muted(true);

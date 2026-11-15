@@ -127,6 +127,38 @@ component AuthScreen inherits HorizontalLayout {
     }
 }
 
+// People asking to join rooms this user hosts. Shown wherever the host happens to be.
+component PendingList inherits VerticalLayout {
+    in property <[PendingItem]> pending;
+    callback decide(int, bool);
+    spacing: 6px;
+    if root.pending.length > 0: Text {
+        text: "Join requests";
+        font-weight: 700;
+    }
+    for p[i] in root.pending: HorizontalLayout {
+        spacing: 8px;
+        Text {
+            text: p.username + " wants to join " + p.code;
+            vertical-alignment: center;
+            horizontal-stretch: 1;
+        }
+        Button {
+            text: "Accept";
+            primary: true;
+            clicked => {
+                root.decide(i, true);
+            }
+        }
+        Button {
+            text: "Deny";
+            clicked => {
+                root.decide(i, false);
+            }
+        }
+    }
+}
+
 component RoomsScreen inherits VerticalLayout {
     in property <[RoomItem]> rooms;
     in property <[PendingItem]> pending;
@@ -193,32 +225,10 @@ component RoomsScreen inherits VerticalLayout {
         }
     }
 
-    if root.pending.length > 0: VerticalLayout {
-        spacing: 6px;
-        Text {
-            text: "Join requests";
-            font-weight: 700;
-        }
-        for p[i] in root.pending: HorizontalLayout {
-            spacing: 8px;
-            Text {
-                text: p.username + " wants to join " + p.code;
-                vertical-alignment: center;
-                horizontal-stretch: 1;
-            }
-            Button {
-                text: "Accept";
-                primary: true;
-                clicked => {
-                    root.decide(i, true);
-                }
-            }
-            Button {
-                text: "Deny";
-                clicked => {
-                    root.decide(i, false);
-                }
-            }
+    PendingList {
+        pending: root.pending;
+        decide(index, accept) => {
+            root.decide(index, accept);
         }
     }
 
@@ -291,6 +301,7 @@ component RoomScreen inherits VerticalLayout {
     in property <string> code;
     in property <[PeerItem]> peers;
     in property <[ShareItem]> shares;
+    in property <[PendingItem]> pending;
     in property <bool> is-host;
     in property <bool> muted;
     in property <bool> me-speaking;
@@ -303,6 +314,7 @@ component RoomScreen inherits VerticalLayout {
     property <int> enlarged: -1;
     property <int> source-index: 0;
     property <bool> share-audio: false;
+    callback decide(int, bool);
     callback toggle-share(int, bool);
     callback leave();
     callback remove-member(int);
@@ -326,6 +338,12 @@ component RoomScreen inherits VerticalLayout {
             clicked => {
                 root.leave();
             }
+        }
+    }
+    PendingList {
+        pending: root.pending;
+        decide(index, accept) => {
+            root.decide(index, accept);
         }
     }
     Text {
@@ -529,6 +547,10 @@ export component MainWindow inherits Window {
                 code: root.room-code;
                 peers: root.peers;
                 shares: root.shares;
+                pending: root.pending;
+                decide(index, accept) => {
+                    root.decide(index, accept);
+                }
                 is-host: root.is-host;
                 muted: root.muted;
                 me-speaking: root.me-speaking;

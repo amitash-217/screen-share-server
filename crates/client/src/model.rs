@@ -189,6 +189,8 @@ impl AppModel {
             }
             ServerMsg::JoinRequested { code, user } => {
                 if !self.pending.iter().any(|(c, p)| *c == code && p.user_id == user.user_id) {
+                    // The host may be inside a room, far from the request list.
+                    self.notice = Some(format!("{} wants to join room {}", user.username, code.as_str()));
                     self.pending.push((code, user));
                 }
             }
@@ -393,6 +395,18 @@ mod tests {
         m.left_room();
         assert!(!m.is_sharer(3));
         assert!(!m.sharing);
+    }
+
+    #[test]
+    fn a_join_request_tells_the_host_even_from_inside_a_room() {
+        let mut m = model();
+        m.apply(server(ServerMsg::Entered { code: code("aaaaa"), peers: vec![], ice: vec![] }));
+        m.apply(server(ServerMsg::JoinRequested { code: code("aaaaa"), user: peer(2, "bob") }));
+        assert_eq!(m.pending.len(), 1);
+        assert_eq!(m.take_notice().as_deref(), Some("bob wants to join room aaaaa"));
+        // The same request again is not announced twice.
+        m.apply(server(ServerMsg::JoinRequested { code: code("aaaaa"), user: peer(2, "bob") }));
+        assert!(m.take_notice().is_none());
     }
 
     #[test]
