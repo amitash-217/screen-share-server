@@ -446,6 +446,11 @@ impl Mesh {
             }
             self.emit(MeshEvent::Level { user, level: remote });
         }
+        // Every 20th poll, so the log shows whether the microphone delivers any sound.
+        static POLLS: std::sync::atomic::AtomicU32 = std::sync::atomic::AtomicU32::new(0);
+        if POLLS.fetch_add(1, std::sync::atomic::Ordering::Relaxed) % 20 == 0 {
+            tracing::info!(level = ?local, enabled = self.local.enabled(), "microphone level");
+        }
         if let Some(level) = local {
             self.emit(MeshEvent::Level { user: self.me, level });
         }
