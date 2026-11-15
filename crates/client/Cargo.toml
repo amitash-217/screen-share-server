@@ -1,0 +1,30 @@
+[package]
+name = "client"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+protocol = { path = "../protocol" }
+serde.workspace = true
+serde_json.workspace = true
+tokio.workspace = true
+tracing.workspace = true
+tracing-subscriber.workspace = true
+anyhow.workspace = true
+futures-util = "0.3"
+slint = "1"
+# native-tls uses the OS certificate store and avoids building a C crypto library on Windows.
+reqwest = { version = "0.12", features = ["json"] }
+tokio-tungstenite = { version = "0.26", features = ["native-tls"] }
+dirs = "6"
+libwebrtc = "0.4"
+global-hotkey = "0.7"
+sysaudio = { path = "../sysaudio" }
+
+[build-dependencies]
+slint-build = "1"
+
+[dev-dependencies]
+server = { path = "../server" }
+axum = "0.8"
+sqlx = { version = "0.8", default-features = false, features = ["runtime-tokio", "postgres", "migrate", "macros"] }

@@ -1,0 +1,4 @@
+# Automatic HTTPS for a domain name. Not usable with a bare IP address.
+{$PUBLIC_HOST} {
+	reverse_proxy server:8080
+}

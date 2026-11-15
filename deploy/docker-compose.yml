@@ -1,0 +1,61 @@
+services:
+  db:
+    image: postgres:16
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: app
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
+      POSTGRES_DB: app
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U app -d app"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  server:
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile.server
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgres://app:${POSTGRES_PASSWORD}@db/app
+      SIGNUP_ENABLED: ${SIGNUP_ENABLED:-true}
+      TURN_SECRET: ${TURN_SECRET:?set TURN_SECRET in .env}
+      PUBLIC_HOST: ${PUBLIC_HOST:?set PUBLIC_HOST in .env}
+      TRUST_PROXY: ${TRUST_PROXY:-false}
+    ports:
+      # Use 127.0.0.1 here when the tls profile (Caddy) is the only way in.
+      - "${SERVER_BIND:-0.0.0.0}:8080:8080"
+
+  # Optional HTTPS for a domain name: docker compose --profile tls up -d
+  caddy:
+    image: caddy:2
+    profiles: ["tls"]
+    restart: unless-stopped
+    depends_on: [server]
+    environment:
+      PUBLIC_HOST: ${PUBLIC_HOST}
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+
+  coturn:
+    image: coturn/coturn:4.6
+    restart: unless-stopped
+    network_mode: host
+    volumes:
+      - ./coturn/turnserver.conf:/etc/coturn/turnserver.conf:ro
+    # --external-ip must be the server's public IP address, never a domain name.
+    command: ["-c", "/etc/coturn/turnserver.conf", "--static-auth-secret=${TURN_SECRET}", "--external-ip=${PUBLIC_IP:?set PUBLIC_IP in .env}"]
+
+volumes:
+  pgdata:
+  caddy_data:

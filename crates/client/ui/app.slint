@@ -1,0 +1,576 @@
+import { Button, LineEdit, CheckBox, ListView, ComboBox } from "std-widgets.slint";
+
+export struct RoomItem {
+    code: string,
+    host: string,
+    permanent: bool,
+    mine: bool,
+}
+
+export struct PendingItem {
+    code: string,
+    username: string,
+}
+
+export struct PeerItem {
+    username: string,
+    speaking: bool,
+    state: string,
+    sharing: bool,
+}
+
+export struct ShareItem {
+    username: string,
+    video: image,
+}
+
+component ConnectScreen inherits HorizontalLayout {
+    in-out property <string> server;
+    in-out property <bool> insecure;
+    in property <bool> busy;
+    callback submit(string, bool);
+    alignment: center;
+
+    VerticalLayout {
+        width: 400px;
+        alignment: center;
+        spacing: 12px;
+        Text {
+            text: "Connect to a server";
+            font-size: 22px;
+            font-weight: 700;
+            horizontal-alignment: center;
+        }
+        LineEdit {
+            placeholder-text: "Server IP or domain, e.g. 203.0.113.10:8080";
+            text <=> root.server;
+            accepted => {
+                root.submit(root.server, root.insecure);
+            }
+        }
+        CheckBox {
+            text: "Allow unencrypted connection (http)";
+            checked <=> root.insecure;
+        }
+        Button {
+            text: root.busy ? "Connecting…" : "Continue";
+            primary: true;
+            enabled: !root.busy;
+            clicked => {
+                root.submit(root.server, root.insecure);
+            }
+        }
+    }
+}
+
+component AuthScreen inherits HorizontalLayout {
+    in property <string> server-label;
+    in-out property <string> username;
+    in property <bool> busy;
+    callback submit(string, string, bool);
+    callback change-server();
+    property <string> password;
+    property <bool> signup: false;
+    alignment: center;
+
+    VerticalLayout {
+        width: 400px;
+        alignment: center;
+        spacing: 12px;
+        Text {
+            text: root.signup ? "Create account" : "Sign in";
+            font-size: 22px;
+            font-weight: 700;
+            horizontal-alignment: center;
+        }
+        Text {
+            text: root.server-label;
+            color: #888888;
+            horizontal-alignment: center;
+        }
+        LineEdit {
+            placeholder-text: "Username";
+            text <=> root.username;
+        }
+        LineEdit {
+            placeholder-text: "Password";
+            input-type: InputType.password;
+            text <=> root.password;
+            accepted => {
+                root.submit(root.username, root.password, root.signup);
+            }
+        }
+        Button {
+            text: root.signup ? "Create account" : "Sign in";
+            primary: true;
+            enabled: !root.busy;
+            clicked => {
+                root.submit(root.username, root.password, root.signup);
+            }
+        }
+        HorizontalLayout {
+            spacing: 8px;
+            alignment: center;
+            Button {
+                text: root.signup ? "I already have an account" : "Create an account";
+                clicked => {
+                    root.signup = !root.signup;
+                }
+            }
+            Button {
+                text: "Change server";
+                clicked => {
+                    root.change-server();
+                }
+            }
+        }
+    }
+}
+
+component RoomsScreen inherits VerticalLayout {
+    in property <[RoomItem]> rooms;
+    in property <[PendingItem]> pending;
+    in property <string> username;
+    in property <bool> connected;
+    callback create-room(bool);
+    callback enter-room(string);
+    callback delete-room(string);
+    callback request-join(string);
+    callback decide(int, bool);
+    callback logout();
+    property <string> join-code;
+    padding: 16px;
+    spacing: 12px;
+
+    HorizontalLayout {
+        spacing: 8px;
+        Text {
+            text: "Signed in as " + root.username;
+            vertical-alignment: center;
+            horizontal-stretch: 1;
+        }
+        Text {
+            text: root.connected ? "● online" : "● reconnecting…";
+            color: root.connected ? #2e9e4f : #d9822b;
+            vertical-alignment: center;
+        }
+        Button {
+            text: "Sign out";
+            clicked => {
+                root.logout();
+            }
+        }
+    }
+
+    HorizontalLayout {
+        spacing: 8px;
+        Button {
+            text: "New temporary room";
+            clicked => {
+                root.create-room(false);
+            }
+        }
+        Button {
+            text: "New permanent room";
+            clicked => {
+                root.create-room(true);
+            }
+        }
+        LineEdit {
+            placeholder-text: "Room code to join";
+            text <=> root.join-code;
+            accepted => {
+                root.request-join(root.join-code);
+                root.join-code = "";
+            }
+        }
+        Button {
+            text: "Request to join";
+            clicked => {
+                root.request-join(root.join-code);
+                root.join-code = "";
+            }
+        }
+    }
+
+    if root.pending.length > 0: VerticalLayout {
+        spacing: 6px;
+        Text {
+            text: "Join requests";
+            font-weight: 700;
+        }
+        for p[i] in root.pending: HorizontalLayout {
+            spacing: 8px;
+            Text {
+                text: p.username + " wants to join " + p.code;
+                vertical-alignment: center;
+                horizontal-stretch: 1;
+            }
+            Button {
+                text: "Accept";
+                primary: true;
+                clicked => {
+                    root.decide(i, true);
+                }
+            }
+            Button {
+                text: "Deny";
+                clicked => {
+                    root.decide(i, false);
+                }
+            }
+        }
+    }
+
+    Text {
+        text: "Your rooms";
+        font-weight: 700;
+    }
+    if root.rooms.length == 0: Text {
+        text: "No rooms yet. Create one, or ask a host for a room code.";
+        color: #888888;
+    }
+    ListView {
+        for r in root.rooms: Rectangle {
+            height: 48px;
+            HorizontalLayout {
+                padding: 8px;
+                spacing: 12px;
+                Text {
+                    text: r.code;
+                    font-size: 18px;
+                    font-weight: 700;
+                    vertical-alignment: center;
+                }
+                Text {
+                    text: (r.permanent ? "permanent" : "temporary") + " · host " + r.host;
+                    vertical-alignment: center;
+                    horizontal-stretch: 1;
+                }
+                Button {
+                    text: "Enter";
+                    primary: true;
+                    clicked => {
+                        root.enter-room(r.code);
+                    }
+                }
+                if r.mine: Button {
+                    text: "Delete";
+                    clicked => {
+                        root.delete-room(r.code);
+                    }
+                }
+            }
+        }
+    }
+}
+
+component ShareTile inherits Rectangle {
+    in property <ShareItem> item;
+    in property <bool> enlarged;
+    callback clicked();
+    background: black;
+    Image {
+        source: root.item.video;
+        image-fit: contain;
+    }
+    Text {
+        text: root.item.username + (root.enlarged ? " (click to shrink)" : "");
+        color: white;
+        x: 8px;
+        y: 8px;
+    }
+    TouchArea {
+        clicked => {
+            root.clicked();
+        }
+    }
+}
+
+component RoomScreen inherits VerticalLayout {
+    in property <string> code;
+    in property <[PeerItem]> peers;
+    in property <[ShareItem]> shares;
+    in property <bool> is-host;
+    in property <bool> muted;
+    in property <bool> me-speaking;
+    in property <[string]> input-devices;
+    in property <[string]> output-devices;
+    in property <bool> sharing;
+    in property <bool> use-picker;
+    in property <[string]> sources;
+    // The person whose screen fills the room view, or -1 for the grid.
+    property <int> enlarged: -1;
+    property <int> source-index: 0;
+    property <bool> share-audio: false;
+    callback toggle-share(int, bool);
+    callback leave();
+    callback remove-member(int);
+    callback toggle-mute();
+    callback input-selected(int);
+    callback output-selected(int);
+    padding: 16px;
+    spacing: 12px;
+
+    HorizontalLayout {
+        spacing: 8px;
+        Text {
+            text: "Room " + root.code;
+            font-size: 22px;
+            font-weight: 700;
+            vertical-alignment: center;
+            horizontal-stretch: 1;
+        }
+        Button {
+            text: "Leave room";
+            clicked => {
+                root.leave();
+            }
+        }
+    }
+    Text {
+        text: "In this room";
+        font-weight: 700;
+    }
+    HorizontalLayout {
+        spacing: 8px;
+        Text {
+            text: (root.me-speaking ? "● " : "○ ") + "You" + (root.muted ? " (muted)" : "");
+            color: root.me-speaking ? #2e9e4f : #888888;
+            vertical-alignment: center;
+            horizontal-stretch: 1;
+        }
+        if !root.use-picker && !root.sharing: ComboBox {
+            model: root.sources;
+            horizontal-stretch: 1;
+            selected => {
+                root.source-index = self.current-index;
+            }
+        }
+        if !root.sharing: CheckBox {
+            text: "Computer sound";
+            checked <=> root.share-audio;
+        }
+        Button {
+            text: root.sharing ? "Stop sharing" : "Share screen";
+            primary: !root.sharing;
+            clicked => {
+                root.toggle-share(root.source-index, root.share-audio);
+            }
+        }
+        Button {
+            text: root.muted ? "Unmute (Ctrl+Alt+M)" : "Mute (Ctrl+Alt+M)";
+            primary: !root.muted;
+            clicked => {
+                root.toggle-mute();
+            }
+        }
+    }
+    HorizontalLayout {
+        spacing: 8px;
+        Text {
+            text: "Microphone";
+            vertical-alignment: center;
+        }
+        ComboBox {
+            model: root.input-devices;
+            horizontal-stretch: 1;
+            selected => {
+                root.input-selected(self.current-index);
+            }
+        }
+        Text {
+            text: "Speakers";
+            vertical-alignment: center;
+        }
+        ComboBox {
+            model: root.output-devices;
+            horizontal-stretch: 1;
+            selected => {
+                root.output-selected(self.current-index);
+            }
+        }
+    }
+    for p[i] in root.peers: HorizontalLayout {
+        spacing: 8px;
+        Text {
+            text: (p.speaking ? "● " : "○ ") + p.username + (p.state != "" ? " · " + p.state : "");
+            color: p.speaking ? #2e9e4f : #888888;
+            vertical-alignment: center;
+            horizontal-stretch: 1;
+        }
+        if root.is-host: Button {
+            text: "Remove from room";
+            clicked => {
+                root.remove-member(i);
+            }
+        }
+    }
+    // One person's screen fills the view when enlarged, otherwise all screens share a row.
+    if root.enlarged >= 0 && root.enlarged < root.shares.length: ShareTile {
+        vertical-stretch: 1;
+        item: root.shares[root.enlarged];
+        enlarged: true;
+        clicked => {
+            root.enlarged = -1;
+        }
+    }
+    if root.enlarged < 0 || root.enlarged >= root.shares.length: HorizontalLayout {
+        vertical-stretch: 1;
+        spacing: 8px;
+        for s[i] in root.shares: ShareTile {
+            item: s;
+            clicked => {
+                root.enlarged = i;
+            }
+        }
+    }
+    if root.sharing: Text {
+        text: "You are sharing your screen";
+        color: #2e9e4f;
+        horizontal-alignment: center;
+    }
+}
+
+export component MainWindow inherits Window {
+    title: "ScreenTalk";
+    preferred-width: 900px;
+    preferred-height: 640px;
+    min-width: 560px;
+    min-height: 420px;
+
+    // 0 connect, 1 sign in, 2 room list, 3 inside a room
+    in-out property <int> screen: 0;
+    in-out property <string> status;
+    in-out property <bool> busy;
+    in-out property <string> server-input;
+    in-out property <bool> insecure-input;
+    in-out property <string> username-input;
+    in property <string> server-label;
+    in property <string> username;
+    in property <bool> connected;
+    in property <[RoomItem]> rooms;
+    in property <[PendingItem]> pending;
+    in property <[PeerItem]> peers;
+    in property <[ShareItem]> shares;
+    in property <string> room-code;
+    in property <bool> is-host;
+    in property <bool> muted;
+    in property <bool> me-speaking;
+    in property <[string]> input-devices;
+    in property <[string]> output-devices;
+    in property <bool> sharing;
+    in property <bool> use-picker;
+    in property <[string]> sources;
+
+    callback toggle-share(int, bool);
+    callback toggle-mute();
+    callback input-selected(int);
+    callback output-selected(int);
+    callback connect(string, bool);
+    callback authenticate(string, string, bool);
+    callback change-server();
+    callback create-room(bool);
+    callback enter-room(string);
+    callback delete-room(string);
+    callback request-join(string);
+    callback decide(int, bool);
+    callback leave-room();
+    callback remove-member(int);
+    callback logout();
+
+    VerticalLayout {
+        Rectangle {
+            vertical-stretch: 1;
+            if root.screen == 0: ConnectScreen {
+                server <=> root.server-input;
+                insecure <=> root.insecure-input;
+                busy: root.busy;
+                submit(server, insecure) => {
+                    root.connect(server, insecure);
+                }
+            }
+            if root.screen == 1: AuthScreen {
+                server-label: root.server-label;
+                username <=> root.username-input;
+                busy: root.busy;
+                submit(user, password, signup) => {
+                    root.authenticate(user, password, signup);
+                }
+                change-server => {
+                    root.change-server();
+                }
+            }
+            if root.screen == 2: RoomsScreen {
+                rooms: root.rooms;
+                pending: root.pending;
+                username: root.username;
+                connected: root.connected;
+                create-room(permanent) => {
+                    root.create-room(permanent);
+                }
+                enter-room(code) => {
+                    root.enter-room(code);
+                }
+                delete-room(code) => {
+                    root.delete-room(code);
+                }
+                request-join(code) => {
+                    root.request-join(code);
+                }
+                decide(index, accept) => {
+                    root.decide(index, accept);
+                }
+                logout => {
+                    root.logout();
+                }
+            }
+            if root.screen == 3: RoomScreen {
+                code: root.room-code;
+                peers: root.peers;
+                shares: root.shares;
+                is-host: root.is-host;
+                muted: root.muted;
+                me-speaking: root.me-speaking;
+                input-devices: root.input-devices;
+                output-devices: root.output-devices;
+                sharing: root.sharing;
+                use-picker: root.use-picker;
+                sources: root.sources;
+                toggle-share(index, audio) => {
+                    root.toggle-share(index, audio);
+                }
+                toggle-mute => {
+                    root.toggle-mute();
+                }
+                input-selected(index) => {
+                    root.input-selected(index);
+                }
+                output-selected(index) => {
+                    root.output-selected(index);
+                }
+                leave => {
+                    root.leave-room();
+                }
+                remove-member(index) => {
+                    root.remove-member(index);
+                }
+            }
+        }
+        if root.status != "": Rectangle {
+            height: 36px;
+            background: #33415c;
+            Text {
+                text: root.status;
+                color: white;
+                vertical-alignment: center;
+                horizontal-alignment: center;
+            }
+            TouchArea {
+                clicked => {
+                    root.status = "";
+                }
+            }
+        }
+    }
+}
