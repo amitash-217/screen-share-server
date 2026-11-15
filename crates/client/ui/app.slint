@@ -279,6 +279,7 @@ component ShareTile inherits Rectangle {
     in property <ShareItem> item;
     in property <bool> enlarged;
     callback clicked();
+    callback fullscreen();
     background: black;
     // The frame's pixel size must not drive the layout, or a 1080p share pushes the controls off the window.
     min-width: 0px;
@@ -301,6 +302,14 @@ component ShareTile inherits Rectangle {
     TouchArea {
         clicked => {
             root.clicked();
+        }
+    }
+    Button {
+        text: "Full screen";
+        x: parent.width - self.width - 8px;
+        y: 8px;
+        clicked => {
+            root.fullscreen();
         }
     }
 }
@@ -329,6 +338,7 @@ component RoomScreen inherits VerticalLayout {
     callback toggle-mute();
     callback input-selected(int);
     callback output-selected(int);
+    callback enter-fullscreen(int);
     padding: 16px;
     spacing: 12px;
 
@@ -441,6 +451,9 @@ component RoomScreen inherits VerticalLayout {
         clicked => {
             root.enlarged = -1;
         }
+        fullscreen => {
+            root.enter-fullscreen(root.enlarged);
+        }
     }
     if root.enlarged < 0 || root.enlarged >= root.shares.length: HorizontalLayout {
         vertical-stretch: 1;
@@ -450,6 +463,9 @@ component RoomScreen inherits VerticalLayout {
             item: s;
             clicked => {
                 root.enlarged = i;
+            }
+            fullscreen => {
+                root.enter-fullscreen(i);
             }
         }
     }
@@ -490,6 +506,16 @@ export component MainWindow inherits Window {
     in property <bool> sharing;
     in property <bool> use-picker;
     in property <[string]> sources;
+    // Index of the share shown over the whole window, or -1.
+    property <int> fullscreen-share: -1;
+    property <bool> controls-visible: false;
+
+    changed full-screen => {
+        // The user left full screen with the system shortcut.
+        if !root.full-screen {
+            root.fullscreen-share = -1;
+        }
+    }
 
     callback toggle-share(int, bool);
     callback toggle-mute();
@@ -587,6 +613,11 @@ export component MainWindow inherits Window {
                 remove-member(index) => {
                     root.remove-member(index);
                 }
+                enter-fullscreen(index) => {
+                    root.fullscreen-share = index;
+                    root.controls-visible = true;
+                    root.full-screen = true;
+                }
             }
         }
         if root.status != "": Rectangle {
@@ -601,6 +632,70 @@ export component MainWindow inherits Window {
             TouchArea {
                 clicked => {
                     root.status = "";
+                }
+            }
+        }
+    }
+
+    if root.fullscreen-share >= 0 && root.fullscreen-share < root.shares.length: Rectangle {
+        x: 0px;
+        y: 0px;
+        width: root.width;
+        height: root.height;
+        background: black;
+        Image {
+            width: parent.width;
+            height: parent.height;
+            source: root.shares[root.fullscreen-share].video;
+            image-fit: contain;
+        }
+        // Moving the mouse shows the controls; they hide again after a pause.
+        TouchArea {
+            moved => {
+                root.controls-visible = true;
+                hide-controls.running = false;
+                hide-controls.running = true;
+            }
+        }
+        hide-controls := Timer {
+            interval: 2500ms;
+            running: root.controls-visible;
+            triggered => {
+                if !bar.has-hover {
+                    root.controls-visible = false;
+                }
+            }
+        }
+        bar := Rectangle {
+            visible: root.controls-visible;
+            y: 0px;
+            width: parent.width;
+            height: 56px;
+            background: #000000aa;
+            property <bool> has-hover: bar-area.has-hover;
+            bar-area := TouchArea {}
+            HorizontalLayout {
+                padding: 8px;
+                spacing: 8px;
+                Text {
+                    text: root.shares[root.fullscreen-share].username;
+                    color: white;
+                    vertical-alignment: center;
+                    horizontal-stretch: 1;
+                }
+                Button {
+                    text: root.muted ? "Unmute" : "Mute";
+                    primary: !root.muted;
+                    clicked => {
+                        root.toggle-mute();
+                    }
+                }
+                Button {
+                    text: "Exit full screen";
+                    clicked => {
+                        root.fullscreen-share = -1;
+                        root.full-screen = false;
+                    }
                 }
             }
         }
