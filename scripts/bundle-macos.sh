@@ -6,6 +6,8 @@
 # user has to right-click > Open, or allow it in System Settings > Privacy & Security.
 set -eu
 
+# Without an explicit binary, build the current source first so the bundle is never stale.
+[ $# -ge 1 ] || cargo build --release -p client
 BIN="${1:-target/release/client}"
 OUT="${2:-target/bundle}"
 APP="$OUT/ScreenTalk.app"

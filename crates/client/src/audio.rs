@@ -95,6 +95,13 @@ impl AudioEngine {
         slot.get_or_insert_with(|| {
             let track = self.factory.create_device_audio_track("microphone");
             track.set_enabled(!self.muted.load(Ordering::Relaxed));
+            // WebRTC only starts the devices once a connection sends or receives audio, so
+            // alone in a room the microphone would stay closed and the OS would never ask
+            // for permission. Open them now.
+            self.factory.init_recording();
+            self.factory.start_recording();
+            self.factory.init_playout();
+            self.factory.start_playout();
             track
         })
         .clone()
