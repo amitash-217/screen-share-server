@@ -327,7 +327,7 @@ impl App {
         let (generation, session_generation) = (st.mesh_generation, st.generation);
         let (events, mut inbox) = unbounded_channel::<MeshEvent>();
         let track = engine.local_track();
-        tracing::info!("microphone open: starting the audio mesh");
+        tracing::info!(state = engine.describe(), "microphone open: starting the audio mesh");
         let mesh = spawn_mesh(&self.rt, engine.factory(), track, &room.ice, st.model.me, ws, events);
         for peer in &room.peers {
             mesh.dial(peer.user_id);
@@ -355,7 +355,12 @@ impl App {
             MeshEvent::Link { user, state } => st.model.set_link(user, state),
             MeshEvent::Level { user, level } => st.model.note_level(user, level, Instant::now()),
             // The platform audio layer already plays remote audio.
-            MeshEvent::RemoteTrack { .. } => return,
+            MeshEvent::RemoteTrack { user, system, .. } => {
+                if let Some(engine) = st.engine.as_ref() {
+                    tracing::info!(user, system, state = engine.describe(), "remote audio track arrived");
+                }
+                return;
+            }
             MeshEvent::RemoteVideo { user, track } => {
                 st.model.set_sharer(user, true);
                 if let Some(old) = st.watchers.remove(&user) {

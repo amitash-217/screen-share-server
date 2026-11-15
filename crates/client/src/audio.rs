@@ -50,6 +50,18 @@ impl AudioEngine {
             .collect()
     }
 
+    /// One line of audio state for the log, to see why nothing is heard.
+    pub fn describe(&self) -> String {
+        format!(
+            "playout enabled={} initialized={} outputs={:?}; recording initialized={} inputs={:?}",
+            self.factory.adm_playout_enabled(),
+            self.factory.playout_is_initialized(),
+            self.outputs().iter().map(|d| d.name.as_str()).collect::<Vec<_>>(),
+            self.factory.recording_is_initialized(),
+            self.inputs().iter().map(|d| d.name.as_str()).collect::<Vec<_>>(),
+        )
+    }
+
     /// Switches the microphone. Returns false if the device is unknown.
     pub fn select_input(&self, guid: &str) -> bool {
         let running = self.factory.recording_is_initialized();

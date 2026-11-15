@@ -649,6 +649,19 @@ export component MainWindow inherits Window {
             source: root.shares[root.fullscreen-share].video;
             image-fit: contain;
         }
+        FocusScope {
+            init => {
+                self.focus();
+            }
+            key-pressed(event) => {
+                if event.text == Key.Escape {
+                    root.fullscreen-share = -1;
+                    root.full-screen = false;
+                    return accept;
+                }
+                reject
+            }
+        }
         // Moving the mouse shows the controls; they hide again after a pause.
         TouchArea {
             moved => {
